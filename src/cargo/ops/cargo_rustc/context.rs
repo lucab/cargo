@@ -75,7 +75,7 @@ impl<'a, 'b: 'a> Context<'a, 'b> {
             compilation: Compilation::new(root_pkg),
             build_state: Arc::new(BuildState::new(build_config.clone(), deps)),
             build_config: build_config,
-            exec_engine: Arc::new(box ProcessEngine as Box<ExecEngine>),
+            exec_engine: Arc::new(Box::new(ProcessEngine) as Box<ExecEngine>),
         })
     }
 
@@ -88,7 +88,7 @@ impl<'a, 'b: 'a> Context<'a, 'b> {
                            .arg("--crate-name").arg("-")
                            .arg("--crate-type").arg("dylib")
                            .arg("--crate-type").arg("bin")
-                           .arg("--print-file-name");
+                           .arg("--print=file-names");
         let process = match target {
             Some(s) => process.arg("--target").arg(s),
             None => process,
@@ -153,9 +153,8 @@ impl<'a, 'b: 'a> Context<'a, 'b> {
 
     fn build_requirements(&mut self, pkg: &'a Package, target: &'a Target,
                           req: Platform) {
-
         let req = if target.get_profile().is_for_host() {Platform::Plugin} else {req};
-        match self.requirements.entry(&(pkg.get_package_id(), target.get_name())) {
+        match self.requirements.entry((pkg.get_package_id(), target.get_name())) {
             Occupied(mut entry) => match (*entry.get(), req) {
                 (Platform::Plugin, Platform::Plugin) |
                 (Platform::PluginAndTarget, Platform::Plugin) |
@@ -363,7 +362,7 @@ impl Platform {
         }
     }
 
-    pub fn each_kind(self, f: |Kind|) {
+    pub fn each_kind<F>(self, mut f: F) where F: FnMut(Kind) {
         match self {
             Platform::Target => f(Kind::Target),
             Platform::Plugin => f(Kind::Host),
